@@ -56,3 +56,5 @@
 ..\obj\main.o: ..\HARDWARE\Meteor\Meteorological.h
 ..\obj\main.o: d:\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
 ..\obj\main.o: d:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+..\obj\main.o: ..\HARDWARE\USART3\usart3.h
+..\obj\main.o: ..\HARDWARE\GPS\gps.h

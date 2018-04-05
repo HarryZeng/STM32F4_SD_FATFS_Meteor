@@ -1,14 +1,25 @@
 #include "sys.h"		    
 #include "rs485.h"	 
 #include "delay.h"
-#include "stdbool.h"
+//////////////////////////////////////////////////////////////////////////////////	 
+//本程序只供学习使用，未经作者许可，不得用于其它任何用途
+//ALIENTEK STM32F407开发板
+//RS485驱动 代码	   
+//正点原子@ALIENTEK
+//技术论坛:www.openedv.com
+//创建日期:2014/5/7
+//版本：V1.0
+//版权所有，盗版必究。
+//Copyright(C) 广州市星翼电子科技有限公司 2014-2024
+//All rights reserved									  
+////////////////////////////////////////////////////////////////////////////////// 	 
 
 
 #if EN_USART2_RX   		//如果使能了接收   	  
 //接收缓存区 	
-u8 RS485_RX_BUF[2000];  	//接收缓冲,最大2000个字节.
+u8 RS485_RX_BUF[2000];  	//接收缓冲,最大64个字节.
 //接收到的数据长度
-uint16_t RS485_RX_CNT=0;   
+u16 RS485_RX_CNT=0;   
 void USART2_IRQHandler(void)
 {
 	u8 res;	    
@@ -91,27 +102,24 @@ void RS485_Send_Data(u8 *buf,u8 len)
 {
 	u8 t;
 	RS485_TX_EN=1;			//设置为发送模式
-	delay_ms(2);
-  for(t=0;t<len;t++)		//循环发送数据
+  	for(t=0;t<len;t++)		//循环发送数据
 	{
-	  while(USART_GetFlagStatus(USART2,USART_FLAG_TC)==RESET)
-		{}			//等待发送结束		
+	  while(USART_GetFlagStatus(USART2,USART_FLAG_TC)==RESET); //等待发送结束		
     USART_SendData(USART2,buf[t]); //发送数据
 	}	 
 	while(USART_GetFlagStatus(USART2,USART_FLAG_TC)==RESET); //等待发送结束		
-	//RS485_RX_CNT=0;	
-	delay_ms(2);
+	RS485_RX_CNT=0;	  
 	RS485_TX_EN=0;				//设置为接收模式	
 }
 //RS485查询接收到的数据
 //buf:接收缓存首地址
 //len:读到的数据长度
-void RS485_Receive_Data(u8 *buf,uint16_t *len)
+void RS485_Receive_Data(u8 *buf,u16 *len)
 {
-	u8 rxlen=RS485_RX_CNT;
-	u8 i=0;
+	u16 rxlen=RS485_RX_CNT;
+	u16 i=0;
 	*len=0;				//默认为0
-	//delay_ms(10);		//等待10ms,连续超过10ms没有接收到一个数据,则认为接收结束
+	delay_ms(10);		//等待10ms,连续超过10ms没有接收到一个数据,则认为接收结束
 	if(rxlen==RS485_RX_CNT&&rxlen)//接收到了数据,且接收完成了
 	{
 		for(i=0;i<rxlen;i++)
@@ -122,5 +130,8 @@ void RS485_Receive_Data(u8 *buf,uint16_t *len)
 		RS485_RX_CNT=0;		//清零
 	}
 }
+
+
+
 
 

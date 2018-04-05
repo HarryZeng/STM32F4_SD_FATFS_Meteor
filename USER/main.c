@@ -14,7 +14,8 @@
 #include "exfuns.h"    
 #include "rs485.h" 
 #include <Meteorological.h>
-
+#include "usart3.h"
+#include "gps.h"
 
 //ALIENTEK 探索者STM32F407开发板 实验39
 //FATFS 实验 -库函数版本
@@ -49,6 +50,48 @@ uint8_t ReadyFlag=0;
 u32 bound=115200;
 #endif
 
+u8 USART1_TX_BUF[USART3_MAX_RECV_LEN]; 					//串口1,发送缓存区
+nmea_msg gpsx; 											//GPS信息
+__align(4) u8 dtbuf[50];   								//打印缓存器
+const u8*fixmode_tbl[4]={"Fail","Fail"," 2D "," 3D "};	//fix mode字符串 
+	  
+
+
+//显示GPS定位信息 
+void Gps_Msg_Show(void)
+{
+ 	float tp;		   
+	//POINT_COLOR=BLUE;  	 
+	tp=gpsx.longitude;	   
+	sprintf((char *)dtbuf,"Longitude:%.5f %1c   ",tp/=100000,gpsx.ewhemi);	//得到经度字符串
+ 	//LCD_ShowString(30,120,200,16,16,dtbuf);	 	   
+	tp=gpsx.latitude;	   
+	sprintf((char *)dtbuf,"Latitude:%.5f %1c   ",tp/=100000,gpsx.nshemi);	//得到纬度字符串
+ 	//LCD_ShowString(30,140,200,16,16,dtbuf);	 	 
+	tp=gpsx.altitude;	   
+ 	sprintf((char *)dtbuf,"Altitude:%.1fm     ",tp/=10);	    			//得到高度字符串
+ 	//LCD_ShowString(30,160,200,16,16,dtbuf);	 			   
+	tp=gpsx.speed;	   
+ 	sprintf((char *)dtbuf,"Speed:%.3fkm/h     ",tp/=1000);		    		//得到速度字符串	 
+ //	LCD_ShowString(30,180,200,16,16,dtbuf);	 				    
+	if(gpsx.fixmode<=3)														//定位状态
+	{  
+		sprintf((char *)dtbuf,"Fix Mode:%s",fixmode_tbl[gpsx.fixmode]);	
+	  //LCD_ShowString(30,200,200,16,16,dtbuf);			   
+	}	 	   
+	sprintf((char *)dtbuf,"GPS+BD Valid satellite:%02d",gpsx.posslnum);	 		//用于定位的GPS卫星数
+ //	LCD_ShowString(30,220,200,16,16,dtbuf);	    
+	sprintf((char *)dtbuf,"GPS Visible satellite:%02d",gpsx.svnum%100);	 		//可见GPS卫星数
+ //	LCD_ShowString(30,240,200,16,16,dtbuf);
+	
+	sprintf((char *)dtbuf,"BD Visible satellite:%02d",gpsx.beidou_svnum%100);	 		//可见北斗卫星数
+ 	//LCD_ShowString(30,260,200,16,16,dtbuf);
+	
+	sprintf((char *)dtbuf,"UTC Date:%04d/%02d/%02d   ",gpsx.utc.year,gpsx.utc.month,gpsx.utc.date);	//显示UTC日期
+	//LCD_ShowString(30,280,200,16,16,dtbuf);		    
+	sprintf((char *)dtbuf,"UTC Time:%02d:%02d:%02d   ",gpsx.utc.hour,gpsx.utc.min,gpsx.utc.sec);	//显示UTC时间
+  //LCD_ShowString(30,300,200,16,16,dtbuf);		  
+}
 
 /*
 1-风向
@@ -61,13 +104,16 @@ u32 bound=115200;
 8-露点温度
 */
 int main(void)
-{        
+{
+	u16 i=0,rxlen;
+	u16 lenx;
 	u32 TIME_Check=0;
  	u32 total,free;
 	u8 keypress=0;
 	u8 res=0;	
-	int i=0;
+	u8 upload=0; 
 	fp = &fileTXT;
+	u8 GPS_Save_File=0;
 	FRESULT res_sd;
 	
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//设置系统中断优先级分组2
@@ -75,57 +121,45 @@ int main(void)
 	uart_init(115200);		//初始化串口波特率为115200
 	LED_Init();					//初始化LED 
 	usmart_dev.init(84);		//初始化USMART
- 	LCD_Init();					//LCD初始化  
+	usart3_init(38400);			//初始化串口3波特率为38400  ->FSMCD13  FSMC_D14
+ 	//LCD_Init();					//LCD初始化  
  	KEY_Init();					//按键初始化 
 	RS485_Init(bound);				//初始化485
 	W25QXX_Init();				//初始化W25Q128
 	my_mem_init(SRAMIN);		//初始化内部内存池 
 	my_mem_init(SRAMCCM);		//初始化CCM内存池
 	
- 	POINT_COLOR=RED;//设置字体为红色 
-	LCD_ShowString(30,50,200,16,16,"Explorer STM32F4");	
-	LCD_ShowString(30,70,200,16,16,"FATFS TEST");	
-	LCD_ShowString(30,90,200,16,16,"ATOM@ALIENTEK");
-	LCD_ShowString(30,110,200,16,16,"2014/5/15");   
-	LCD_ShowString(30,130,200,16,16,"Use USMART for test");	   
  	while(SD_Init())//检测不到SD卡
 	{
-		LCD_ShowString(30,150,200,16,16,"SD Card Error!");
+		//LCD_ShowString(30,150,200,16,16,"SD Card Error!");
 		delay_ms(500);					
-		LCD_ShowString(30,150,200,16,16,"Please Check! ");
+		//LCD_ShowString(30,150,200,16,16,"Please Check! ");
 		delay_ms(500);
 		LED0=!LED0;//DS0闪烁
 	}
  	exfuns_init();							//为fatfs相关变量申请内存				 
-  	f_mount(fs[0],"0:",1); 					//挂载SD卡 
+  f_mount(fs[0],"0:",1); 					//挂载SD卡 
  	res=f_mount(fs[1],"1:",1); 				//挂载FLASH.	
 	if(res==0X0D)//FLASH磁盘,FAT文件系统错误,重新格式化FLASH
 	{
-		LCD_ShowString(30,150,200,16,16,"Flash Disk Formatting...");	//格式化FLASH
+		//LCD_ShowString(30,150,200,16,16,"Flash Disk Formatting...");	//格式化FLASH
 		res=f_mkfs("1:",1,4096);//格式化FLASH,1,盘符;1,不需要引导区,8个扇区为1个簇
 		if(res==0)
 		{
 			f_setlabel((const TCHAR *)"1:ALIENTEK");	//设置Flash磁盘的名字为：ALIENTEK
-			LCD_ShowString(30,150,200,16,16,"Flash Disk Format Finish");	//格式化完成
-		}else LCD_ShowString(30,150,200,16,16,"Flash Disk Format Error ");	//格式化失败
+			//LCD_ShowString(30,150,200,16,16,"Flash Disk Format Finish");	//格式化完成
+		}
+//		else 
+//			LCD_ShowString(30,150,200,16,16,"Flash Disk Format Error ");	//格式化失败
 		delay_ms(1000);
 	}													    
-	LCD_Fill(30,150,240,150+16,WHITE);		//清除显示			  
+  
 	while(exf_getfree("0",&total,&free))	//得到SD卡的总容量和剩余容量
 	{
-		LCD_ShowString(30,150,200,16,16,"SD Card Fatfs Error!");
-		delay_ms(200);
-		LCD_Fill(30,150,240,150+16,WHITE);	//清除显示			  
 		delay_ms(200);
 		LED0=!LED0;//DS0闪烁
 	}													  			    
- 	POINT_COLOR=BLUE;//设置字体为蓝色	   
-	LCD_ShowString(30,150,200,16,16,"FATFS OK!");	 
-	LCD_ShowString(30,170,200,16,16,"SD Total Size:     MB");	 
-	LCD_ShowString(30,190,200,16,16,"SD  Free Size:     MB"); 	    
- 	LCD_ShowNum(30+8*14,170,total>>10,5,16);				//显示SD卡总容量 MB
- 	LCD_ShowNum(30+8*14,190,free>>10,5,16);					//显示SD卡剩余容量 MB			
-	
+
 	printf("Press WKUP_PRES to PutTXTdata2TFCardTest \r\n");
 	printf("Press KEY0_PRES to PutTXTdata2Uart \r\n");
 	printf("Press KEY1_PRES to RS485 bound set 115200; \r\n");
@@ -163,6 +197,10 @@ int main(void)
 					//PutTXTdata2TFCardTest();
 					break;
 				case KEY0_PRES:
+						if(upload)
+								upload = 0;
+						else 
+								upload = 1;
 //							WorkInFlag = 1;
 //							ReadyFlag = 1;
 //							printf("Work In Meteor Station -- WorkFlag:%d \r\n",WorkInFlag);
@@ -201,19 +239,24 @@ int main(void)
 		else if(WorkInFlag==1&&ReadyFlag==1)
 		{
 				TIME_Check++;
-			if(TIME_Check>=50)
+			if(TIME_Check>=60)
 			{
 				TIME_Check =0;
 				ReadMeteorVal();
 			}
-			delay_ms(20);
 			RS485_Receive_Data(ReceiveBuf,&ReceiveBufCounter);
+			delay_ms(20);
 			if(ReceiveBufCounter)//接收到有数据
 			{
-				LED0=0;
+				if(GPS_Save_File)
+				{
+					GPS_Save_File = 0;
+					PutData2TXT(USART1_TX_BUF,rxlen);  /*保存GPS数据*/
+					LED1 = 0;
+				}
 				
 				PutData2TXT(ReceiveBuf,ReceiveBufCounter);
-				
+				LED0=0;
 				/**清零缓存数据**/
 				for(i=0;i<ReceiveBufCounter;i++)
 				{
@@ -224,6 +267,7 @@ int main(void)
 			else
 			{
 				LED0=1;
+				LED1=1;
 			}			
 		}
 		/*****************气象设备数据----读取******************/
@@ -249,6 +293,18 @@ int main(void)
 				LED0=1;
 			}
 		}
+		/*******************GPS数据**********************/
+		if(USART3_RX_STA&0X8000)		//接收到一次数据了
+		{
+			rxlen=USART3_RX_STA&0X7FFF;	//得到数据长度
+			for(i=0;i<rxlen;i++)USART1_TX_BUF[i]=USART3_RX_BUF[i];	   
+ 			USART3_RX_STA=0;		   	//启动下一次接收
+			USART1_TX_BUF[i]=0;			//自动添加结束符
+			//GPS_Analysis(&gpsx,(u8*)USART1_TX_BUF);//分析字符串
+			//Gps_Msg_Show();				//显示信息	
+			GPS_Save_File = 1;
+			if(upload)printf("\r\n%s\r\n",USART1_TX_BUF);//发送接收到的数据到串口1
+ 		}		
 	} 
 }
 uint32_t ByteCounter=0;

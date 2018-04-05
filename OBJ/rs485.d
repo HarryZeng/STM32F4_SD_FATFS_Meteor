@@ -37,4 +37,3 @@
 ..\obj\rs485.o: ..\FWLIB\inc\stm32f4xx_fsmc.h
 ..\obj\rs485.o: ..\HARDWARE\RS485\rs485.h
 ..\obj\rs485.o: ..\SYSTEM\delay\delay.h
-..\obj\rs485.o: d:\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h

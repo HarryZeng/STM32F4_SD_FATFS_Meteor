@@ -334,7 +334,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40 STM32F40_41xxx,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\HARDWARE\LED;..\HARDWARE\LCD;..\HARDWARE\KEY;..\HARDWARE\SRAM;..\HARDWARE\SDIO;..\MALLOC;..\USMART;..\HARDWARE\SPI;..\HARDWARE\W25QXX;..\FATFS\exfuns;..\FATFS\src;..\FWLIB\inc;..\HARDWARE\RS485;..\HARDWARE\Meteor</IncludePath>
+              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\HARDWARE\LED;..\HARDWARE\LCD;..\HARDWARE\KEY;..\HARDWARE\SRAM;..\HARDWARE\SDIO;..\MALLOC;..\USMART;..\HARDWARE\SPI;..\HARDWARE\W25QXX;..\FATFS\exfuns;..\FATFS\src;..\FWLIB\inc;..\HARDWARE\RS485;..\HARDWARE\Meteor;..\HARDWARE\GPS;..\HARDWARE\USART3;..\HARDWARE\TIMER</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -409,11 +409,6 @@
               <FilePath>..\HARDWARE\LED\led.c</FilePath>
             </File>
             <File>
-              <FileName>lcd.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\LCD\lcd.c</FilePath>
-            </File>
-            <File>
               <FileName>key.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\KEY\key.c</FilePath>
@@ -437,6 +432,21 @@
               <FileName>rs485.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\RS485\rs485.c</FilePath>
+            </File>
+            <File>
+              <FileName>usart3.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\USART3\usart3.c</FilePath>
+            </File>
+            <File>
+              <FileName>timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\TIMER\timer.c</FilePath>
+            </File>
+            <File>
+              <FileName>gps.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\GPS\gps.c</FilePath>
             </File>
           </Files>
         </Group>
